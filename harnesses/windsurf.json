@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "figma-browser-bridge": {
+      "command": "node",
+      "args": [
+        "${PROJECT_ROOT}/server/index.js"
+      ]
+    }
+  }
+}

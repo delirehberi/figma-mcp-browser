@@ -18,14 +18,18 @@ from ctypes import wintypes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from datetime import datetime, timezone
 
-kernel32 = ctypes.windll.kernel32
-kernel32.DuplicateHandle.argtypes = [
-    wintypes.HANDLE, wintypes.HANDLE, wintypes.HANDLE,
-    ctypes.POINTER(wintypes.HANDLE), wintypes.DWORD, wintypes.BOOL, wintypes.DWORD
-]
-
-GetFinalPathNameByHandleW = kernel32.GetFinalPathNameByHandleW
-GetFinalPathNameByHandleW.argtypes = [wintypes.HANDLE, wintypes.LPWSTR, wintypes.DWORD, wintypes.DWORD]
+is_windows = sys.platform == 'win32'
+if is_windows:
+    kernel32 = ctypes.windll.kernel32
+    kernel32.DuplicateHandle.argtypes = [
+        wintypes.HANDLE, wintypes.HANDLE, wintypes.HANDLE,
+        ctypes.POINTER(wintypes.HANDLE), wintypes.DWORD, wintypes.BOOL, wintypes.DWORD
+    ]
+    GetFinalPathNameByHandleW = kernel32.GetFinalPathNameByHandleW
+    GetFinalPathNameByHandleW.argtypes = [wintypes.HANDLE, wintypes.LPWSTR, wintypes.DWORD, wintypes.DWORD]
+else:
+    kernel32 = None
+    GetFinalPathNameByHandleW = None
 
 def get_dpapi_key(local_state_path):
     if not os.path.exists(local_state_path):
@@ -46,6 +50,8 @@ def get_dpapi_key(local_state_path):
         return None
 
 def read_db_from_handle(pid, handle_val, dst_path):
+    if not is_windows or not kernel32:
+        return False
     h_proc = kernel32.OpenProcess(0x0040, False, pid)
     if not h_proc:
         raise RuntimeError(f"Could not open process PID {pid}")
@@ -221,6 +227,13 @@ def get_last_completed_login_session():
     2. Chrome Default User Data
     Returns the source with the most recent authenticated session.
     """
+    if not is_windows:
+        fallback_json = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'figma_session.json')
+        if os.path.exists(fallback_json):
+            with open(fallback_json, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return None
+
     candidates = []
 
     # 1. Figma Desktop

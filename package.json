@@ -11,6 +11,7 @@
   "scripts": {
     "start": "node server/index.js",
     "package": "node scripts/package.js",
+    "setup-harness": "node scripts/setup-harness.js",
     "sync-session": "python server/session_sync.py --sync-mcp",
     "session-status": "python server/session_sync.py --status"
   },

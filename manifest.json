@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "Figma MCP Bridge",
   "version": "1.1.0",
+  "minimum_chrome_version": "116",
   "description": "Bridges Figma node data to a local Model Context Protocol (MCP) server in real-time.",
   "permissions": [
     "activeTab",

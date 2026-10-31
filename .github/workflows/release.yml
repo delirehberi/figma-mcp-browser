@@ -37,4 +37,5 @@ jobs:
             --title "Figma MCP Bridge $GITHUB_REF_NAME" \
             --generate-notes \
             dist/figma-mcp-bridge-${{ steps.version.outputs.VERSION }}.zip \
-            dist/figma-mcp-server-${{ steps.version.outputs.VERSION }}.tar.gz
+            dist/figma-mcp-server-${{ steps.version.outputs.VERSION }}.tar.gz \
+            dist/figma-mcp-universal-suite-${{ steps.version.outputs.VERSION }}.zip

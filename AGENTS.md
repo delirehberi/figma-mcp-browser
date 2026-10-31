@@ -27,7 +27,8 @@ Package name: `figma-mcp-browser` (v1.1.0).
 | Task | Command | Notes |
 |---|---|---|
 | Start MCP Server | `npm start` (or `node server/index.js`) | Starts WebSocket server on `127.0.0.1:9223` and connects MCP over stdio |
-| Build Release Packages | `npm run package` | Builds distributable archives in `dist/` (`.zip` and `.tar.gz`) |
+| Configure AI Harnesses | `npm run setup-harness` | Auto-detects and configures Claude, Cursor, Antigravity, Windsurf, Cline, Zed |
+| Build Release Packages | `npm run package` | Builds all 3 archives in `dist/` (Extension zip, Server tarball, Universal suite) |
 | Sync Figma Session | `npm run sync-session` | Runs `python server/session_sync.py --sync-mcp` to sync cookies to MCP browser |
 | Check Session Status | `npm run session-status` | Runs `python server/session_sync.py --status` to inspect valid session metadata |
 | Install Server Deps | `cd server && npm install` | Installs `@modelcontextprotocol/sdk` and `ws` |
@@ -66,8 +67,8 @@ Add to `claude_desktop_config.json`:
 
 ```text
 figma-mcp-browser/
-├── manifest.json            # Chrome MV3 manifest (permissions: scripting, alarms, tabs, cookies)
-├── background.js           # MV3 background service worker: WebSocket client, keep-alive, tab router, badge controller
+├── manifest.json            # Chrome MV3 manifest (minimum_chrome_version: 116, permissions)
+├── background.js           # MV3 service worker: WebSocket client, 20s heartbeat, tab router, badge
 ├── content.js              # Content script (ISOLATED world): URL poller, keep-alive port, postMessage bridge
 ├── inject.js               # Page script (MAIN world): accesses window.figma, serializes node tree & a11y specs
 ├── popup.html              # Extension toolbar popup dashboard UI
@@ -76,9 +77,13 @@ figma-mcp-browser/
 ├── icons/                  # Extension PNG and SVG icons (16px, 48px, 128px)
 ├── bin/
 │   └── figma-mcp-browser.js # CLI / npx executable entry point
+├── harnesses/              # Presets for Claude, Cursor, Windsurf, Antigravity, Cline, Zed
 ├── scripts/
 │   ├── package.js          # Cross-platform Node packaging wrapper
-│   └── package.py          # Python zip & tar release packager
+│   ├── package.py          # Python zip & tar release packager (3 artifacts)
+│   └── setup-harness.js    # Multi-harness auto-configurator
+├── setup.bat               # 1-click Windows setup launcher
+├── setup.sh                # 1-click macOS/Linux setup launcher
 ├── package.json            # Root npm package metadata & scripts
 ├── README.md               # User documentation, architecture diagrams, installation guide
 ├── LICENSE                 # MIT License
@@ -86,21 +91,25 @@ figma-mcp-browser/
 │
 ├── server/                 # Local MCP Server & Session Engine
 │   ├── index.js            # Node MCP server (stdio) + WebSocket server (127.0.0.1:9223)
-│   ├── session_manager.js  # Node subprocess bridge to session_sync.py
-│   ├── session_sync.py     # Python Win32 DPAPI + handle duplication + SQLite cookie sync
+│   ├── session_manager.js  # Node subprocess bridge with cross-platform python fallback
+│   ├── session_sync.py     # Python Win32 DPAPI + handle duplication + cross-platform fallback
 │   ├── package.json        # Server dependencies (@modelcontextprotocol/sdk, ws)
 │   └── package-lock.json   # Locked server dependencies
 │
 ├── .github/
 │   └── workflows/
-│       └── release.yml     # GitHub Actions workflow for extension zip & server tarball releases
+│       └── release.yml     # GitHub Actions workflow (builds 3 release artifacts)
 │
 ├── .claude/
 │   └── agents/             # Specialized Claude subagents (extension, protocol, session)
 │
 └── .agents/
     ├── rules/              # Antigravity project rules
-    └── skills/             # On-demand Antigravity diagnostic skills
+    └── skills/             # AI Agent skills:
+        ├── figma-design-to-code/
+        ├── figma-harness-setup/
+        ├── figma-mcp-debug/
+        └── figma-session-manager/
 ```
 
 ---

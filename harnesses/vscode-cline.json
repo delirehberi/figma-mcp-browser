@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "figma-browser-bridge": {
+      "command": "node",
+      "args": [
+        "${PROJECT_ROOT}/server/index.js"
+      ],
+      "disabled": false,
+      "autoApprove": [
+        "get_figma_node",
+        "get_active_selection",
+        "get_session_status"
+      ]
+    }
+  }
+}

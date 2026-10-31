@@ -7,41 +7,74 @@ const __dirname = path.dirname(__filename);
 const SCRIPT_PATH = path.join(__dirname, "session_sync.py");
 
 /**
- * Execute session_sync.py with specified flags and return parsed JSON
+ * Intelligent Python interpreter auto-discovery across Windows, macOS, and Linux
+ */
+function getPythonCandidateCommands() {
+  if (process.env.PYTHON_PATH) {
+    return [process.env.PYTHON_PATH];
+  }
+  if (process.platform === "win32") {
+    return ["python", "py", "python3"];
+  }
+  return ["python3", "python"];
+}
+
+/**
+ * Execute session_sync.py with interpreter fallback and return parsed JSON
  */
 function runSessionSync(args = []) {
+  const candidates = getPythonCandidateCommands();
+
   return new Promise((resolve, reject) => {
-    const pythonExe = process.env.PYTHON_PATH || "python";
-    const proc = spawn(pythonExe, [SCRIPT_PATH, "--json", ...args], {
-      windowsHide: true
-    });
+    let index = 0;
 
-    let stdout = "";
-    let stderr = "";
-
-    proc.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    proc.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    proc.on("close", (code) => {
-      if (code !== 0) {
-        return reject(new Error(stderr.trim() || `Session sync failed with exit code ${code}`));
+    function tryNext() {
+      if (index >= candidates.length) {
+        return reject(
+          new Error("Python interpreter not found on system. Please ensure Python 3.10+ is installed.")
+        );
       }
+
+      const candidate = candidates[index++];
+      let proc;
+
       try {
-        const parsed = JSON.parse(stdout.trim());
-        resolve(parsed);
-      } catch (err) {
-        reject(new Error(`Failed to parse session sync output: ${stdout || stderr}`));
+        proc = spawn(candidate, [SCRIPT_PATH, "--json", ...args], {
+          windowsHide: true,
+        });
+      } catch (_) {
+        return tryNext();
       }
-    });
 
-    proc.on("error", (err) => {
-      reject(new Error(`Failed to start python process: ${err.message}`));
-    });
+      let stdout = "";
+      let stderr = "";
+
+      proc.stdout.on("data", (chunk) => {
+        stdout += chunk.toString();
+      });
+
+      proc.stderr.on("data", (chunk) => {
+        stderr += chunk.toString();
+      });
+
+      proc.on("error", () => {
+        tryNext();
+      });
+
+      proc.on("close", (code) => {
+        if (code !== 0) {
+          return reject(new Error(stderr.trim() || `Session sync failed with exit code ${code}`));
+        }
+        try {
+          const parsed = JSON.parse(stdout.trim());
+          resolve(parsed);
+        } catch (err) {
+          reject(new Error(`Failed to parse session sync output: ${stdout || stderr}`));
+        }
+      });
+    }
+
+    tryNext();
   });
 }
 
@@ -66,4 +99,3 @@ export async function syncFigmaSessionToBrowser() {
   }
   return result.metadata;
 }
-

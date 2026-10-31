@@ -67,12 +67,22 @@ Instead of hitting the rate-limited REST API, this extension injects a script in
 4. Click **Load unpacked** and select the extension folder.
 5. The **Figma MCP Bridge** icon will appear in your toolbar. Pin it to see live connection status (`ON` / `OFF`).
 
-### 2. Configure Your AI Client
+### 2. Configure Your AI Client (Automated or Manual)
 
-#### Claude Desktop
-Add to your Claude configuration file:
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+#### Automated Setup (Recommended)
+Run the multi-harness setup tool to automatically detect and configure all installed AI clients (Claude Desktop, Cursor, Antigravity, Windsurf, VS Code Cline, Zed):
+
+```bash
+# On Windows / macOS / Linux:
+npm run setup-harness
+
+# Or double-click setup.bat (Windows) or ./setup.sh (macOS/Linux)
+```
+
+#### Manual Configurations
+
+<details>
+<summary><b>Claude Desktop</b> (<code>claude_desktop_config.json</code>)</summary>
 
 ```json
 {
@@ -84,10 +94,11 @@ Add to your Claude configuration file:
   }
 }
 ```
+</details>
 
-> **Tip**: You can also use `npx -y figma-mcp-browser` once published or run the binary launcher `bin/figma-mcp-browser.js`.
+<details>
+<summary><b>Cursor IDE</b> (<code>.cursor/mcp.json</code>)</summary>
 
-#### Antigravity / Gemini CLI (`mcp_config.json`)
 ```json
 {
   "mcpServers": {
@@ -98,6 +109,80 @@ Add to your Claude configuration file:
   }
 }
 ```
+</details>
+
+<details>
+<summary><b>Google Antigravity &amp; Gemini CLI</b> (<code>mcp_config.json</code>)</summary>
+
+```json
+{
+  "mcpServers": {
+    "figma-browser-bridge": {
+      "command": "node",
+      "args": ["c:/Users/Parallel/Documents/others/figma-mcp-browser/server/index.js"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Windsurf</b> (<code>~/.codeium/windsurf/mcp_config.json</code>)</summary>
+
+```json
+{
+  "mcpServers": {
+    "figma-browser-bridge": {
+      "command": "node",
+      "args": ["c:/Users/Parallel/Documents/others/figma-mcp-browser/server/index.js"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>VS Code (Cline / Roo Code)</b> (<code>cline_mcp_settings.json</code>)</summary>
+
+```json
+{
+  "mcpServers": {
+    "figma-browser-bridge": {
+      "command": "node",
+      "args": ["c:/Users/Parallel/Documents/others/figma-mcp-browser/server/index.js"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Zed Editor</b> (<code>settings.json</code>)</summary>
+
+```json
+{
+  "context_servers": {
+    "figma-browser-bridge": {
+      "command": {
+        "path": "node",
+        "args": ["c:/Users/Parallel/Documents/others/figma-mcp-browser/server/index.js"]
+      }
+    }
+  }
+}
+```
+</details>
+
+---
+
+## AI Agent Skills (<code>.agents/skills/</code>)
+
+The project includes specialized skills designed for AI coding agents:
+
+- **`figma-design-to-code`**: Comprehensive engineering rules to transform AutoLayout, typography, colors, strokes, and accessibility roles into React/Tailwind/HTML.
+- **`figma-harness-setup`**: Runbook and diagnostic guide for connecting and troubleshooting MCP hosts.
+- **`figma-session-manager`**: Safe DPAPI session extraction and cookie synchronization runbook.
+- **`figma-mcp-debug`**: 4-hop architecture verification, toolbar badge states, and connection recovery.
 
 ---
 
@@ -206,7 +291,8 @@ The node data is recursively serialized with full styling and accessibility cont
 | Command | Action |
 |---|---|
 | `npm start` | Launches the local WebSocket and MCP server (`node server/index.js`) |
-| `npm run package` | Builds clean release archives in `dist/` (`.zip` and `.tar.gz`) |
+| `npm run setup-harness` | Auto-detects and configures all installed AI harnesses (Claude, Cursor, Antigravity, etc.) |
+| `npm run package` | Builds all 3 clean release archives in `dist/` (Extension zip, Server tarball, Universal Suite) |
 | `npm run sync-session` | Extracts and syncs local Figma session cookies to the MCP browser profile |
 | `npm run session-status` | Displays authenticated Figma account metadata |
 
