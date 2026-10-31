@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Figma MCP Bridge</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="header">
+    <div class="logo-group">
+      <img src="icons/icon48.png" alt="Figma MCP Logo" class="logo">
+      <div>
+        <h1 class="title">Figma MCP Bridge</h1>
+        <span class="version" id="versionLabel">v1.1.0</span>
+      </div>
+    </div>
+    <div id="bridgeStatusBadge" class="badge badge-disconnected">Checking...</div>
+  </header>
+
+  <main class="content">
+    <!-- Server Connection Card -->
+    <section class="card">
+      <div class="card-header">
+        <span class="card-title">Local MCP Server</span>
+        <span id="wsDot" class="status-dot dot-red"></span>
+      </div>
+      <div class="card-body">
+        <div class="info-row">
+          <span class="label">WebSocket</span>
+          <span class="value" id="wsEndpoint">ws://127.0.0.1:9223</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Status</span>
+          <span class="value" id="wsStatusText">Connecting...</span>
+        </div>
+      </div>
+      <div class="card-actions">
+        <button id="btnReconnect" class="btn btn-secondary">
+          <svg class="btn-icon" viewBox="0 0 16 16" fill="currentColor">
+            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+          </svg>
+          Reconnect
+        </button>
+      </div>
+    </section>
+
+    <!-- Active Figma Context Card -->
+    <section class="card">
+      <div class="card-header">
+        <span class="card-title">Active Figma Tab</span>
+        <span id="figmaDot" class="status-dot dot-gray"></span>
+      </div>
+      <div class="card-body">
+        <div class="info-row">
+          <span class="label">File Key</span>
+          <span class="value" id="figmaFileKey">None</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Selected Layer</span>
+          <span class="value" id="figmaNodeId">None</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Script Injected</span>
+          <span class="value" id="figmaInjected">No</span>
+        </div>
+      </div>
+      <div class="card-actions">
+        <button id="btnRefreshTabs" class="btn btn-secondary">
+          <svg class="btn-icon" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/>
+            <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 14 8a.5.5 0 0 1-1 0 5 5 0 0 0-5-5zm-5 5a5 5 0 0 0 5 5c1.552 0 2.94-.707 3.857-1.818a.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2 8a.5.5 0 0 1 1 0z"/>
+          </svg>
+          Refresh Tabs
+        </button>
+      </div>
+    </section>
+
+    <!-- Session Status Card -->
+    <section class="card">
+      <div class="card-header">
+        <span class="card-title">Figma Session Sync</span>
+        <span id="sessionDot" class="status-dot dot-gray"></span>
+      </div>
+      <div class="card-body">
+        <div class="info-row">
+          <span class="label">Account</span>
+          <span class="value" id="sessionUser">Detecting...</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Cookie Status</span>
+          <span class="value" id="sessionStatus">Checking...</span>
+        </div>
+      </div>
+      <div class="card-actions">
+        <button id="btnSyncSession" class="btn btn-primary">
+          <svg class="btn-icon" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M11 1a2 2 0 0 0-2 2v4a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h5V3a3 3 0 0 1 6 0v4a.5.5 0 0 1-1 0V3a2 2 0 0 0-2-2z"/>
+          </svg>
+          Sync Session
+        </button>
+      </div>
+    </section>
+
+    <!-- Notification Toast -->
+    <div id="statusToast" class="toast hidden"></div>
+  </main>
+
+  <footer class="footer">
+    <span>Zero-Token Bridge for Claude &amp; Antigravity</span>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

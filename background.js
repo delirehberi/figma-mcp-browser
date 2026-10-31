@@ -9,15 +9,36 @@ let socket = null;
 let reconnectDelay = 1000;
 const MAX_RECONNECT_DELAY = 16000;
 let activePorts = new Set();
+let latestSelection = null;
 
 // Tracks tabs that have already had inject.js injected into the MAIN world.
 // Prevents redundant re-injection on repeated requests to the same tab.
 const injectedTabs = new Set();
 
+// Update toolbar icon badge status
+function updateBadge(status) {
+  if (!chrome.action) return;
+  try {
+    if (status === "connected") {
+      chrome.action.setBadgeText({ text: "ON" });
+      chrome.action.setBadgeBackgroundColor({ color: "#0ACF83" });
+      chrome.action.setTitle({ title: "Figma MCP Bridge: Connected (ws://127.0.0.1:9223)" });
+    } else if (status === "reconnecting") {
+      chrome.action.setBadgeText({ text: "..." });
+      chrome.action.setBadgeBackgroundColor({ color: "#F59E0B" });
+      chrome.action.setTitle({ title: "Figma MCP Bridge: Reconnecting..." });
+    } else {
+      chrome.action.setBadgeText({ text: "OFF" });
+      chrome.action.setBadgeBackgroundColor({ color: "#EF4444" });
+      chrome.action.setTitle({ title: "Figma MCP Bridge: Disconnected" });
+    }
+  } catch (_) {}
+}
 
 // 1. Establish WebSocket Connection with Auto-reconnect & Exponential Backoff
 function connectWebSocket() {
   console.log(`[Figma MCP] Connecting to WebSocket at ${MCP_WEBSOCKET_URL}...`);
+  updateBadge("reconnecting");
   
   if (socket) {
     try {
@@ -29,6 +50,7 @@ function connectWebSocket() {
 
   socket.onopen = () => {
     console.log("[Figma MCP] WebSocket connection established successfully.");
+    updateBadge("connected");
     reconnectDelay = 1000; // Reset backoff on successful connection
   };
 
@@ -49,11 +71,13 @@ function connectWebSocket() {
 
   socket.onclose = (event) => {
     console.warn(`[Figma MCP] WebSocket disconnected (Code: ${event.code}). Reconnecting in ${reconnectDelay}ms...`);
+    updateBadge("disconnected");
     scheduleReconnect();
   };
 
   socket.onerror = (error) => {
     console.error("[Figma MCP] WebSocket error:", error);
+    updateBadge("disconnected");
   };
 }
 
@@ -148,7 +172,7 @@ async function handleGetNodeData(requestId, fileKey, nodeId, fetchSelection = fa
   }
 }
 
-// 4. Manifest V3 Service Worker Keep-Alive Management
+// 5. Manifest V3 Service Worker Keep-Alive Management
 
 // Keep-Alive via tab Port connection
 chrome.runtime.onConnect.addListener((port) => {
@@ -179,9 +203,15 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// Handle tab selection change updates forwarded from content scripts
+// Message listener for popup requests and content script events
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Handle tab selection change updates forwarded from content scripts
   if (message.action === "SELECTION_CHANGED") {
+    latestSelection = {
+      fileKey: message.fileKey,
+      nodeId: message.nodeId,
+      timestamp: Date.now()
+    };
     console.log("[Figma MCP] Broadcast selection change:", message.nodeId);
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({
@@ -194,9 +224,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+
+  // Handle extension popup state queries
+  if (message.action === "GET_POPUP_STATE") {
+    sendResponse({
+      wsConnected: Boolean(socket && socket.readyState === WebSocket.OPEN),
+      isConnecting: Boolean(!socket && reconnectDelay > 1000),
+      injectedTabs: Array.from(injectedTabs),
+      lastSelection: latestSelection
+    });
+    return true;
+  }
+
+  // Handle manual reconnect trigger from popup
+  if (message.action === "TRIGGER_RECONNECT") {
+    console.log("[Figma MCP] Manual reconnect requested from popup.");
+    reconnectDelay = 1000;
+    connectWebSocket();
+    sendResponse({ success: true });
+    return true;
+  }
 });
 
-// 5. Clear injection guard on tab navigation or closure so inject.js is re-injected
+// 6. Clear injection guard on tab navigation or closure so inject.js is re-injected
 // into the fresh page context if the user navigates within the same tab.
 // Also proactively inject inject.js as soon as a Figma tab finishes loading so
 // window.injectFigma is available immediately — before any tool call is made.

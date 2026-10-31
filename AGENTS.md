@@ -18,7 +18,7 @@ Instead of hitting the rate-limited REST API, this project injects a script into
 - **MCP Server**: Node.js 22+ (ES Modules), `@modelcontextprotocol/sdk` (stdio transport), `ws` (WebSocket server on `127.0.0.1:9223`).
 - **Session Sync**: Python 3.10+ (Win32 `kernel32` ctypes, DPAPI via PowerShell `ProtectedData`, `cryptography` AES-GCM, SQLite3).
 
-Package name: `figma-mcp-browser` (v1.0.0).
+Package name: `figma-mcp-browser` (v1.1.0).
 
 ---
 
@@ -27,6 +27,7 @@ Package name: `figma-mcp-browser` (v1.0.0).
 | Task | Command | Notes |
 |---|---|---|
 | Start MCP Server | `npm start` (or `node server/index.js`) | Starts WebSocket server on `127.0.0.1:9223` and connects MCP over stdio |
+| Build Release Packages | `npm run package` | Builds distributable archives in `dist/` (`.zip` and `.tar.gz`) |
 | Sync Figma Session | `npm run sync-session` | Runs `python server/session_sync.py --sync-mcp` to sync cookies to MCP browser |
 | Check Session Status | `npm run session-status` | Runs `python server/session_sync.py --status` to inspect valid session metadata |
 | Install Server Deps | `cd server && npm install` | Installs `@modelcontextprotocol/sdk` and `ws` |
@@ -66,10 +67,19 @@ Add to `claude_desktop_config.json`:
 ```text
 figma-mcp-browser/
 ├── manifest.json            # Chrome MV3 manifest (permissions: scripting, alarms, tabs, cookies)
-├── background.js           # MV3 background service worker: WebSocket client, keep-alive, tab router
+├── background.js           # MV3 background service worker: WebSocket client, keep-alive, tab router, badge controller
 ├── content.js              # Content script (ISOLATED world): URL poller, keep-alive port, postMessage bridge
-├── inject.js               # Page script (MAIN world): accesses window.figma, serializes node tree
-├── package.json            # Root npm scripts (start, sync-session, session-status)
+├── inject.js               # Page script (MAIN world): accesses window.figma, serializes node tree & a11y specs
+├── popup.html              # Extension toolbar popup dashboard UI
+├── popup.js                # Extension popup controller (queries background state & Chrome tabs)
+├── popup.css               # Extension popup styling (dark mode, responsive cards)
+├── icons/                  # Extension PNG and SVG icons (16px, 48px, 128px)
+├── bin/
+│   └── figma-mcp-browser.js # CLI / npx executable entry point
+├── scripts/
+│   ├── package.js          # Cross-platform Node packaging wrapper
+│   └── package.py          # Python zip & tar release packager
+├── package.json            # Root npm package metadata & scripts
 ├── README.md               # User documentation, architecture diagrams, installation guide
 ├── LICENSE                 # MIT License
 ├── .gitignore              # Git ignore rules

@@ -1,6 +1,6 @@
 {
   "name": "figma-mcp-server-bridge",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Local WebSocket-to-Stdio MCP Bridge for Figma Chrome Extension",
   "main": "index.js",
   "type": "module",

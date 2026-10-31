@@ -89,6 +89,28 @@
     });
   }
 
+  function serializeStrokes(strokes, figma) {
+    if (!strokes || strokes === figma.mixed) return [];
+    return strokes.map(stroke => {
+      const serialized = {
+        type: stroke.type,
+        visible: stroke.visible !== false
+      };
+      if (stroke.opacity !== undefined) {
+        serialized.opacity = stroke.opacity;
+      }
+      if (stroke.color) {
+        serialized.color = {
+          r: Math.round(stroke.color.r * 255),
+          g: Math.round(stroke.color.g * 255),
+          b: Math.round(stroke.color.b * 255),
+          a: stroke.opacity !== undefined ? stroke.opacity : 1
+        };
+      }
+      return serialized;
+    });
+  }
+
   function getDimensions(node) {
     const box = node.absoluteBoundingBox;
     if (box) {
@@ -151,6 +173,55 @@
     return null;
   }
 
+  // Accessibility (A11y) and Dev Mode specification context
+  function getAccessibilityContext(node) {
+    const a11y = {};
+
+    // 1. Explicit descriptions or design system documentation
+    if (node.description) {
+      a11y.description = node.description;
+    }
+    if (node.documentationLinks && Array.isArray(node.documentationLinks) && node.documentationLinks.length > 0) {
+      a11y.documentationLinks = node.documentationLinks;
+    }
+
+    // 2. Figma Dev Mode annotations (e.g. accessibility notes, screen reader labels)
+    if (node.annotations && Array.isArray(node.annotations) && node.annotations.length > 0) {
+      a11y.annotations = node.annotations.map(a => ({
+        label: a.label || null,
+        properties: a.properties || []
+      }));
+    }
+
+    // 3. Inferred semantic role hints to assist LLM comprehension
+    if (node.type === "TEXT") {
+      const fs = node.fontSize;
+      if (typeof fs === "number") {
+        if (fs >= 28) a11y.inferredRole = "heading-1";
+        else if (fs >= 22) a11y.inferredRole = "heading-2";
+        else if (fs >= 18) a11y.inferredRole = "heading-3";
+        else a11y.inferredRole = "text";
+      }
+      if (node.hyperlink) {
+        a11y.inferredRole = "link";
+        a11y.hyperlink = node.hyperlink;
+      }
+    } else if (node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE") {
+      const lowerName = (node.name || "").toLowerCase();
+      if (lowerName.includes("btn") || lowerName.includes("button")) {
+        a11y.inferredRole = "button";
+      } else if (lowerName.includes("input") || lowerName.includes("textfield")) {
+        a11y.inferredRole = "input";
+      } else if (lowerName.includes("dialog") || lowerName.includes("modal")) {
+        a11y.inferredRole = "dialog";
+      } else if (lowerName.includes("nav") || lowerName.includes("header")) {
+        a11y.inferredRole = "navigation";
+      }
+    }
+
+    return Object.keys(a11y).length > 0 ? a11y : null;
+  }
+
   function normalizePluginNode(node, figma) {
     if (!node) return null;
 
@@ -161,10 +232,19 @@
       // false only when the layer is explicitly hidden in the editor (eye icon off).
       // Defaults to true when the property is absent (e.g. page root nodes).
       visible: node.visible !== false,
+      opacity: typeof node.opacity === "number" ? node.opacity : 1,
+      blendMode: node.blendMode || "NORMAL",
+      isMask: Boolean(node.isMask),
+      clipsContent: node.clipsContent !== undefined ? Boolean(node.clipsContent) : null,
       dimensions: getDimensions(node),
+      cornerRadius: node.cornerRadius !== figma.mixed ? (node.cornerRadius ?? 0) : null,
       autoLayout: getAutoLayout(node),
       fills: serializeFills(node.fills, figma),
+      strokes: serializeStrokes(node.strokes, figma),
+      strokeWeight: node.strokeWeight !== figma.mixed ? (node.strokeWeight ?? 0) : null,
+      strokeAlign: node.strokeAlign || null,
       textContext: getTextContext(node, figma),
+      accessibility: getAccessibilityContext(node),
       children: null
     };
 
