@@ -19,6 +19,11 @@ yarn-error.log*
 logs/
 *.log
 
-# Build/Dist (if any)
+# Build/Dist
 dist/
 node_modules/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
