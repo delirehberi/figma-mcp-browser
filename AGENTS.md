@@ -18,7 +18,7 @@ Instead of hitting the rate-limited REST API, this project injects a script into
 - **MCP Server**: Node.js 22+ (ES Modules), `@modelcontextprotocol/sdk` (stdio transport), `ws` (WebSocket server on `127.0.0.1:9223`).
 - **Session Sync**: Python 3.10+ (Win32 `kernel32` ctypes, DPAPI via PowerShell `ProtectedData`, `cryptography` AES-GCM, SQLite3).
 
-Package name: `figma-mcp-browser` (v1.1.0).
+Package name: `figma-mcp-browser` (v1.2.0).
 
 ---
 
