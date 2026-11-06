@@ -13,7 +13,9 @@
     "package": "node scripts/package.js",
     "setup-harness": "node scripts/setup-harness.js",
     "sync-session": "python server/session_sync.py --sync-mcp",
-    "session-status": "python server/session_sync.py --status"
+    "session-status": "python server/session_sync.py --status",
+    "session-state": "python server/session_sync.py --active-state",
+    "collect-session": "python server/session_sync.py --session-data"
   },
   "keywords": [
     "figma",

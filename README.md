@@ -295,6 +295,8 @@ The node data is recursively serialized with full styling and accessibility cont
 | `npm run package` | Builds all 3 clean release archives in `dist/` (Extension zip, Server tarball, Universal Suite) |
 | `npm run sync-session` | Extracts and syncs local Figma session cookies to the MCP browser profile |
 | `npm run session-status` | Displays authenticated Figma account metadata |
+| `npm run session-state` | Displays currently active Figma file, node, and open tabs from the loaded session |
+| `npm run collect-session` | Exports full session metadata, active state, and cookie status |
 
 ---
 

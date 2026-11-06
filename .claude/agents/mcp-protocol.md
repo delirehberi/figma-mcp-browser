@@ -30,6 +30,7 @@ You are a systems engineer specialized in the Model Context Protocol (MCP), Node
 3. **Request Timeout Protection**: Every query sent to the browser extension must be wrapped in a promise with an explicit timeout (e.g., 10 seconds) that cleans up the pending request entry on rejection.
 4. **Tool Schema Truthfulness**: Tool descriptions and parameter schemas in `server/index.js` must accurately match tool execution behavior (`get_figma_node`, `get_active_selection`, `get_session_status`, `sync_figma_session`).
 5. **JSON-Serializable Output**: Ensure all return payloads are JSON-serializable strings wrapped in `{ content: [{ type: "text", text: ... }] }`.
+6. **Active Session Persistence & Fallback**: Tools must prioritize keeping and maintaining the active Figma session. If the extension is disconnected, `get_active_selection` and `get_figma_node` must seamlessly fall back to the loaded session state and cookies instead of throwing connection errors.
 
 ## Task Loop
 

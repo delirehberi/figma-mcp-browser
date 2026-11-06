@@ -49,25 +49,31 @@ node server/index.js
 
 ---
 
-## 3. Check Figma Session Status
+## 3. Verify & Maintain Active Figma Session
 
-Verify that a valid authenticated Figma login is detected on the local system:
+Verify that an active, authenticated Figma session is continuously maintained on the local system:
 
 ```powershell
+# 1. Check account authentication & cookie health
 npm run session-status
-# or:
-python server/session_sync.py --status
+
+# 2. Inspect active file, selected layer, and open tabs
+npm run session-state
+
+# 3. Dump full session data (metadata, active state, tokens)
+npm run collect-session
 ```
 
 **Checks**:
 - Is `authenticated: true`?
 - Is `sessionExpires` in the future?
+- Is `activeFileKey` and `activeNodeId` correctly detected in `session-state`?
 - Is cookie count > 0?
 
-If cookies are locked or the session is expired:
-1. Open Figma Desktop or Chrome.
-2. Log into Figma.
-3. Run `npm run sync-session` to push active cookies to the MCP browser profile.
+**Maintain and refresh the session**:
+1. If cookies are locked or the session is expired, log into Figma in Figma Desktop or Chrome.
+2. Run `npm run sync-session` to push fresh decrypted cookies into the MCP browser profile.
+3. Test tool `get_session_active_state` to ensure the active document context is preserved.
 
 ---
 

@@ -437,11 +437,332 @@ def sync_to_mcp_profile(session_data):
     conn.close()
     return inserted
 
+def get_active_session_state():
+    """
+    Reads active Figma Desktop / Browser state (open tabs, active file, selected node, recents).
+    """
+    settings_path = os.path.expandvars(r'%APPDATA%\Figma\settings.json')
+    if not os.path.exists(settings_path):
+        return {
+            'activeFileKey': None,
+            'activeNodeId': None,
+            'activeTitle': None,
+            'openTabs': [],
+            'recentFiles': []
+        }
+    try:
+        import re
+        with open(settings_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except Exception as e:
+        return {'error': str(e), 'openTabs': [], 'recentFiles': []}
+
+    import re
+    active_file_key = None
+    active_node_id = None
+    active_title = None
+    open_tabs = []
+
+    windows = data.get('windows', [])
+    for win in windows:
+        active_tab_path = win.get('activeTabPath', '')
+        m = re.search(r'/(?:file|design)/([a-zA-Z0-9_-]+)', active_tab_path)
+        if m:
+            active_file_key = m.group(1)
+
+        for tab in win.get('tabs', []):
+            path = tab.get('path', '')
+            tm = re.search(r'/(?:file|design)/([a-zA-Z0-9_-]+)', path)
+            fk = tm.group(1) if tm else None
+
+            params = tab.get('params', '')
+            nm = re.search(r'node-id=([0-9]+[-:][0-9]+)', params)
+            nid = nm.group(1).replace('-', ':') if nm else None
+
+            t_info = {
+                'title': tab.get('title'),
+                'fileKey': fk,
+                'nodeId': nid,
+                'path': path,
+                'lastViewedAt': tab.get('lastViewedAt'),
+                'thumbnail': tab.get('thumbnail', {}).get('url') if isinstance(tab.get('thumbnail'), dict) else None
+            }
+            open_tabs.append(t_info)
+            if fk == active_file_key and not active_node_id and nid:
+                active_node_id = nid
+                active_title = tab.get('title')
+
+    recent_files = []
+    for item in data.get('sharedRecentlyClosedHistory', []):
+        path = item.get('path', '')
+        rm = re.search(r'/(?:file|design)/([a-zA-Z0-9_-]+)', path)
+        rfk = rm.group(1) if rm else None
+        params = item.get('params', '')
+        rnm = re.search(r'node-id=([0-9]+[-:][0-9]+)', params)
+        rnid = rnm.group(1).replace('-', ':') if rnm else None
+        recent_files.append({
+            'title': item.get('title'),
+            'fileKey': rfk,
+            'nodeId': rnid,
+            'path': path
+        })
+
+    return {
+        'activeFileKey': active_file_key,
+        'activeNodeId': active_node_id,
+        'activeTitle': active_title,
+        'openTabs': open_tabs,
+        'recentFiles': recent_files[:10]
+    }
+
+def get_discovered_pat():
+    """
+    Discovers Figma Personal Access Token from environment or MCP configs.
+    """
+    for var in ['FIGMA_PERSONAL_ACCESS_TOKEN', 'FIGMA_API_KEY', 'FIGMA_TOKEN']:
+        val = os.environ.get(var)
+        if val and val.strip():
+            return val.strip()
+
+    # Search Antigravity / Gemini CLI config
+    mcp_config = os.path.expandvars(r'%USERPROFILE%\.gemini\config\mcp_config.json')
+    if os.path.exists(mcp_config):
+        try:
+            with open(mcp_config, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            figma_env = data.get('mcpServers', {}).get('figma', {}).get('env', {})
+            token = figma_env.get('FIGMA_PERSONAL_ACCESS_TOKEN') or figma_env.get('FIGMA_API_KEY')
+            if token and token.strip():
+                return token.strip()
+        except Exception:
+            pass
+
+    return None
+
+def normalize_rest_node(node):
+    """
+    Normalizes a Figma REST API node tree into the identical schema used by inject.js.
+    """
+    if not node:
+        return None
+
+    bbox = node.get('absoluteBoundingBox')
+    dim = {
+        'width': bbox.get('width', node.get('width', 0)) if bbox else node.get('width', 0),
+        'height': bbox.get('height', node.get('height', 0)) if bbox else node.get('height', 0),
+        'absoluteBoundingBox': bbox if bbox else {
+            'x': node.get('x', 0),
+            'y': node.get('y', 0),
+            'width': node.get('width', 0),
+            'height': node.get('height', 0)
+        }
+    }
+
+    layout_mode = node.get('layoutMode')
+    auto_layout = None
+    if layout_mode and layout_mode != 'NONE':
+        auto_layout = {
+            'direction': layout_mode,
+            'itemSpacing': node.get('itemSpacing', 0),
+            'padding': {
+                'left': node.get('paddingLeft', 0),
+                'right': node.get('paddingRight', 0),
+                'top': node.get('paddingTop', 0),
+                'bottom': node.get('paddingBottom', 0)
+            }
+        }
+
+    fills = []
+    for f in node.get('fills', []):
+        fill_obj = {
+            'type': f.get('type'),
+            'visible': f.get('visible', True)
+        }
+        if 'opacity' in f:
+            fill_obj['opacity'] = f['opacity']
+        col = f.get('color')
+        if col:
+            fill_obj['color'] = {
+                'r': round(col.get('r', 0) * 255),
+                'g': round(col.get('g', 0) * 255),
+                'b': round(col.get('b', 0) * 255),
+                'a': f.get('opacity', col.get('a', 1))
+            }
+        fills.append(fill_obj)
+
+    strokes = []
+    for s in node.get('strokes', []):
+        stroke_obj = {
+            'type': s.get('type'),
+            'visible': s.get('visible', True)
+        }
+        if 'opacity' in s:
+            stroke_obj['opacity'] = s['opacity']
+        col = s.get('color')
+        if col:
+            stroke_obj['color'] = {
+                'r': round(col.get('r', 0) * 255),
+                'g': round(col.get('g', 0) * 255),
+                'b': round(col.get('b', 0) * 255),
+                'a': s.get('opacity', col.get('a', 1))
+            }
+        strokes.append(stroke_obj)
+
+    text_ctx = None
+    if node.get('type') == 'TEXT':
+        style = node.get('style', {})
+        text_ctx = {
+            'characters': node.get('characters', ''),
+            'fontSize': style.get('fontSize'),
+            'fontFamily': style.get('fontFamily'),
+            'fontWeight': style.get('fontWeight') or style.get('fontPostScriptName')
+        }
+
+    a11y = {}
+    if node.get('description'):
+        a11y['description'] = node['description']
+    if node.get('type') == 'TEXT' and text_ctx and text_ctx.get('fontSize'):
+        fs = text_ctx['fontSize']
+        if isinstance(fs, (int, float)):
+            if fs >= 28: a11y['inferredRole'] = 'heading-1'
+            elif fs >= 22: a11y['inferredRole'] = 'heading-2'
+            elif fs >= 18: a11y['inferredRole'] = 'heading-3'
+            else: a11y['inferredRole'] = 'text'
+    elif node.get('type') in ('FRAME', 'COMPONENT', 'INSTANCE'):
+        lname = (node.get('name') or '').lower()
+        if 'btn' in lname or 'button' in lname: a11y['inferredRole'] = 'button'
+        elif 'input' in lname or 'textfield' in lname: a11y['inferredRole'] = 'input'
+        elif 'dialog' in lname or 'modal' in lname: a11y['inferredRole'] = 'dialog'
+        elif 'nav' in lname or 'header' in lname: a11y['inferredRole'] = 'navigation'
+
+    children = None
+    if 'children' in node and node['children']:
+        children = [normalize_rest_node(c) for c in node['children'] if c]
+
+    return {
+        'id': node.get('id'),
+        'name': node.get('name'),
+        'type': node.get('type'),
+        'visible': node.get('visible', True),
+        'opacity': node.get('opacity', 1),
+        'blendMode': node.get('blendMode', 'NORMAL'),
+        'isMask': bool(node.get('isMask', False)),
+        'clipsContent': node.get('clipsContent'),
+        'dimensions': dim,
+        'cornerRadius': node.get('cornerRadius'),
+        'autoLayout': auto_layout,
+        'fills': fills,
+        'strokes': strokes,
+        'strokeWeight': node.get('strokeWeight'),
+        'strokeAlign': node.get('strokeAlign'),
+        'textContext': text_ctx,
+        'accessibility': a11y if a11y else None,
+        'children': children
+    }
+
+def fetch_figma_file_data(file_key, session_data):
+    """
+    Fetches Figma file metadata using session cookies.
+    """
+    import urllib.request
+    import urllib.error
+    cookie_map = {c['name']: c['raw_value'] for c in session_data['cookies'] if c.get('raw_value')}
+    cookie_header = '; '.join([f'{k}={v}' for k, v in cookie_map.items()])
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Cookie': cookie_header,
+        'Accept': 'application/json',
+    }
+
+    url = f'https://www.figma.com/api/files/{file_key}'
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            data = json.loads(resp.read().decode())
+            meta = data.get('meta', {})
+            return {
+                'success': True,
+                'source': 'figma_session_cookies',
+                'fileKey': file_key,
+                'title': meta.get('name'),
+                'updatedAt': meta.get('updated_at'),
+                'thumbnailUrl': meta.get('thumbnail_url'),
+                'creatorId': meta.get('creator_id'),
+                'editorType': meta.get('editor_type'),
+                'rawMeta': meta
+            }
+    except urllib.error.HTTPError as e:
+        return {'success': False, 'error': f"HTTP {e.code}: {e.read().decode()[:200]}"}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+def fetch_figma_node_data(file_key, node_id, session_data):
+    """
+    Fetches Figma node data using discovered PAT or fallback to session metadata.
+    """
+    import urllib.request
+    import urllib.error
+    normalized_node_id = node_id.replace('-', ':')
+    pat = get_discovered_pat()
+
+    if pat:
+        try:
+            url = f'https://api.figma.com/v1/files/{file_key}/nodes?ids={normalized_node_id}'
+            headers = {
+                'X-Figma-Token': pat,
+                'Accept': 'application/json'
+            }
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = json.loads(resp.read().decode())
+                nodes = data.get('nodes', {})
+                node_wrapper = nodes.get(normalized_node_id) or nodes.get(node_id)
+                if node_wrapper and 'document' in node_wrapper:
+                    norm = normalize_rest_node(node_wrapper['document'])
+                    return {
+                        'success': True,
+                        'source': 'figma_api_pat',
+                        'fileKey': file_key,
+                        'nodeId': normalized_node_id,
+                        'nodeData': norm
+                    }
+        except urllib.error.HTTPError as e:
+            # 429 or 401 fallback
+            pass
+        except Exception:
+            pass
+
+    # Fallback: Query file details via session cookies + desktop state
+    file_info = fetch_figma_file_data(file_key, session_data)
+    desktop_state = get_active_session_state()
+
+    matched_tab = None
+    for tab in desktop_state.get('openTabs', []):
+        if tab.get('fileKey') == file_key:
+            matched_tab = tab
+            break
+
+    return {
+        'success': True,
+        'source': 'loaded_browser_session',
+        'fileKey': file_key,
+        'nodeId': normalized_node_id,
+        'title': file_info.get('title') or (matched_tab.get('title') if matched_tab else None),
+        'thumbnailUrl': file_info.get('thumbnailUrl') or (matched_tab.get('thumbnail') if matched_tab else None),
+        'fileInfo': file_info,
+        'desktopContext': matched_tab
+    }
+
 def main():
     parser = argparse.ArgumentParser(description="Figma Session Sync Utility")
     parser.add_argument("--status", action="store_true", help="Print status of the latest Figma session")
     parser.add_argument("--sync-mcp", action="store_true", help="Sync session cookies into MCP browser profile")
     parser.add_argument("--export", type=str, help="Export clean session cookies to JSON file")
+    parser.add_argument("--session-data", action="store_true", help="Output full session metadata, active desktop state, and cookies")
+    parser.add_argument("--active-state", action="store_true", help="Output active desktop state (active file, node, tabs)")
+    parser.add_argument("--fetch-file", type=str, help="Fetch file metadata using loaded session cookies")
+    parser.add_argument("--fetch-node", nargs=2, metavar=('FILE_KEY', 'NODE_ID'), help="Fetch node data using loaded session")
     parser.add_argument("--json", action="store_true", help="Output machine-readable JSON")
     args = parser.parse_args()
 
@@ -456,6 +777,50 @@ def main():
 
     meta = parse_session_metadata(session_data['cookies'])
     meta['source'] = session_data['source_name']
+
+    if args.active_state:
+        state = get_active_session_state()
+        if args.json:
+            print(json.dumps({"success": True, "activeState": state}))
+        else:
+            print(f"Active File: {state.get('activeFileKey')}")
+            print(f"Active Node: {state.get('activeNodeId')}")
+            print(f"Open Tabs: {len(state.get('openTabs', []))}")
+        return
+
+    if args.fetch_file:
+        file_res = fetch_figma_file_data(args.fetch_file, session_data)
+        if args.json:
+            print(json.dumps(file_res))
+        else:
+            print(json.dumps(file_res, indent=2))
+        return
+
+    if args.fetch_node:
+        fk, nid = args.fetch_node
+        node_res = fetch_figma_node_data(fk, nid, session_data)
+        if args.json:
+            print(json.dumps(node_res))
+        else:
+            print(json.dumps(node_res, indent=2))
+        return
+
+    if args.session_data:
+        state = get_active_session_state()
+        pat = get_discovered_pat()
+        cookie_map = {c['name']: c['raw_value'] for c in session_data['cookies'] if c.get('raw_value')}
+        payload = {
+            "success": True,
+            "metadata": meta,
+            "activeState": state,
+            "hasDiscoveredPat": bool(pat),
+            "cookieCount": len(cookie_map)
+        }
+        if args.json:
+            print(json.dumps(payload))
+        else:
+            print(json.dumps(payload, indent=2))
+        return
 
     if args.export:
         cookie_map = {c['name']: c['raw_value'] for c in session_data['cookies'] if c.get('raw_value')}

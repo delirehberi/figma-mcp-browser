@@ -12,6 +12,20 @@ Use this skill whenever converting Figma node data retrieved via `get_figma_node
 
 ---
 
+## 0. Prerequisite: Maintain Active Session Context
+
+Before generating frontend code, the AI agent MUST maintain and verify the active Figma session:
+
+1. **Maintain Continuous Session**:
+   - Always verify that the active session is alive using `get_session_active_state` or `get_session_status`.
+   - If the user has not specified a `fileKey` or `nodeId`, **never ask the user for them manually**. Instead, call `get_active_selection` or `get_session_active_state` to automatically obtain the active file and currently selected layer from the maintained browser/desktop session.
+
+2. **Session-Driven Node Retrieval**:
+   - If the live Chrome extension is disconnected or idle, seamlessly rely on the loaded session (`source: "loaded_browser_session"`). The MCP server automatically bridges node data and file context using the decrypted session cookies.
+   - Maintain the active `fileKey`, `nodeId`, and document title across iterative component revisions.
+
+---
+
 ## 1. Node Structure & Layout Translation
 
 ### Auto-Layout to Flexbox & CSS Grid

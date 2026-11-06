@@ -99,3 +99,47 @@ export async function syncFigmaSessionToBrowser() {
   }
   return result.metadata;
 }
+
+/**
+ * Get active desktop & browser Figma state (active tab, file, node ID, open tabs)
+ */
+export async function getActiveSessionState() {
+  const result = await runSessionSync(["--active-state"]);
+  if (!result.success) {
+    throw new Error(result.error || "Unable to retrieve active Figma session state");
+  }
+  return result.activeState;
+}
+
+/**
+ * Fetch Figma file metadata via loaded browser session
+ */
+export async function fetchFigmaFileViaSession(fileKey) {
+  const result = await runSessionSync(["--fetch-file", fileKey]);
+  if (!result.success) {
+    throw new Error(result.error || `Unable to fetch Figma file for key: ${fileKey}`);
+  }
+  return result;
+}
+
+/**
+ * Fetch Figma node data via loaded browser session
+ */
+export async function fetchFigmaNodeViaSession(fileKey, nodeId) {
+  const result = await runSessionSync(["--fetch-node", fileKey, nodeId]);
+  if (!result.success) {
+    throw new Error(result.error || `Unable to fetch Figma node ${nodeId} for file ${fileKey}`);
+  }
+  return result;
+}
+
+/**
+ * Get comprehensive session payload (metadata, active state, cookies count, token status)
+ */
+export async function getLoadedSessionData() {
+  const result = await runSessionSync(["--session-data"]);
+  if (!result.success) {
+    throw new Error(result.error || "Unable to retrieve full Figma session data");
+  }
+  return result;
+}

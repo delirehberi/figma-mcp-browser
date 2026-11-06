@@ -31,6 +31,8 @@ Package name: `figma-mcp-browser` (v1.1.0).
 | Build Release Packages | `npm run package` | Builds all 3 archives in `dist/` (Extension zip, Server tarball, Universal suite) |
 | Sync Figma Session | `npm run sync-session` | Runs `python server/session_sync.py --sync-mcp` to sync cookies to MCP browser |
 | Check Session Status | `npm run session-status` | Runs `python server/session_sync.py --status` to inspect valid session metadata |
+| Check Active Session State | `npm run session-state` | Runs `python server/session_sync.py --active-state` to inspect active file, node, and tabs |
+| Collect Full Session Data | `npm run collect-session` | Runs `python server/session_sync.py --session-data` to dump session and active state |
 | Install Server Deps | `cd server && npm install` | Installs `@modelcontextprotocol/sdk` and `ws` |
 | Load Extension in Chrome | Open `chrome://extensions` → Enable Developer Mode → **Load unpacked** | Select root repository directory `c:\Users\Parallel\Documents\others\figma-mcp-browser` |
 
