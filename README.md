@@ -1,19 +1,23 @@
-# Figma MCP Bridge Chrome Extension
+# Figma MCP Bridge Chrome Extension & Server
 
-An open-source Chromium extension that bridges Figma node data directly from an active browser tab to a local Model Context Protocol (MCP) server — **without a Figma REST API token or Personal Access Token (PAT)**.
+An open-source Chromium extension and local Model Context Protocol (MCP) server that bridges live Figma node data directly from an active browser tab to AI coding agents (Claude, Antigravity, Cursor, Codex) — **without requiring a Figma REST API token or Personal Access Token (PAT)**.
 
-Instead of hitting the REST API, this extension injects a script into the Figma page's MAIN JavaScript world and reads node data directly from `window.figma` — the same in-memory Plugin API that Figma plugins use. This gives you instant access to the live document tree: typography, fills, auto-layout, dimensions, and the full recursive child hierarchy.
+Instead of hitting the rate-limited REST API, this extension injects a script into the Figma page's MAIN JavaScript world and reads node data directly from `window.figma` — the same in-memory Plugin API that native Figma plugins use. This gives your AI agents instant access to the live document tree: auto-layout, geometry, typography, fills, strokes, accessibility annotations, and the full recursive child hierarchy.
 
 ---
 
 ## Features
 
-- **No API Token Required** — No Figma PAT, no OAuth, no rate limits.
-- **Full Node Tree** — Recursively serializes all children of a node: frames, text layers, images, vectors, and nested components.
-- **Plugin API Access** — Reads from `window.figma` directly (same data source as Figma plugins), not the REST API.
-- **WebSocket Bridge** — Connects to a local MCP server at `ws://127.0.0.1:9223` with automatic reconnect and exponential backoff.
-- **Real-Time Selection Tracking** — Emits `SELECTION_CHANGED` events when you select a different layer in Figma.
-- **Resilient Service Worker** — Keep-alive ports and alarm heartbeats prevent the MV3 service worker from being suspended.
+- **No API Token Required** — No Figma PAT, no OAuth permissions, and zero rate limits.
+- **Full Recursive Node Tree** — Serializes entire layer hierarchies: frames, text layers, vector shapes, components, and instances.
+- **Accessibility & Dev Mode Metadata** — Serializes Figma Dev Mode annotations, accessibility notes, descriptions, semantic role hints, and visual contrast parameters (`opacity`, `blendMode`, `isMask`, `clipsContent`).
+- **Interactive Extension Popup & Toolbar Badges** — Chrome toolbar badge reflects WebSocket status (`ON` green / `OFF` red / `...` yellow) with a popup dashboard showing connected server, active Figma tab, and session state.
+- **Direct CLI / NPX Launcher** — Start the MCP server instantly with `npx figma-mcp-browser` without manual cloning or configuration.
+- **Plugin API Access** — Direct in-memory access via `window.figma` with multi-tier iframe and DevTools fallback discovery.
+- **WebSocket Bridge** — Communicates with the local MCP server over `ws://127.0.0.1:9223` with auto-reconnect and exponential backoff.
+- **Real-Time Selection Tracking** — Emits `SELECTION_CHANGED` events when the designer clicks or navigates layers in Figma.
+- **Windows Session Auto-Sync** — Extracts authenticated session cookies (`figma.session`, `__Host-figma.authn`, etc.) from running Figma Desktop or Chrome processes via DPAPI and Win32 handle duplication, syncing them into headless browser profiles.
+- **Automated Packaging** — Single command `npm run package` builds clean distribution `.zip` and `.tar.gz` bundles locally and in CI.
 
 ---
 
@@ -28,175 +32,251 @@ Instead of hitting the REST API, this extension injects a script into the Figma 
 │  │ (ISOLATED)    │                  │  • window.figma Plugin API         │  │
 │  │ • URL polling │                  │  • getNodeByIdAsync()              │  │
 │  │ • keep-alive  │                  │  • currentPage.selection           │  │
-│  └───────┬───────┘                  │  • recursive child traversal       │  │
-│          │ chrome.tabs.sendMessage  └────────────────────────────────────┘  │
+│  │ • popup state │                  │  • recursive traversal & a11y specs│  │
+│  └───────┬───────┘                  └────────────────────────────────────┘  │
+│          │ chrome.tabs.sendMessage                                          │
 └──────────┼──────────────────────────────────────────────────────────────────┘
            │
 ┌──────────▼──────────┐    WebSocket     ┌──────────────────┐
 │   background.js     │ ◄──────────────► │  server/index.js │ ◄── AI Client
 │  (Service Worker)   │  ws://127.0.0.1  │  (MCP Server)    │     (Claude, etc.)
-│  • chrome.scripting │  :9223           └──────────────────┘
-│  • tab management   │
+│  • popup controller │  :9223           └──────────────────┘
+│  • badge status     │
 └─────────────────────┘
 ```
 
 ### Request Flow
 
-1. AI client calls a tool (e.g. `get_figma_node`) via MCP.
+1. AI client triggers a tool call (e.g. `get_figma_node` or `get_active_selection`) via MCP stdio.
 2. MCP server sends a `GET_NODE_DATA` message to the background service worker over WebSocket.
-3. Background injects `inject.js` into the Figma tab's **MAIN world** via `chrome.scripting.executeScript` (bypasses Figma's Content Security Policy).
-4. Background sends a `FETCH_NODE_DATA` message to `content.js`.
-5. `content.js` forwards it to `inject.js` via `window.postMessage`.
-6. `inject.js` reads data from `window.figma` and serializes the full node tree recursively.
-7. The response travels back: `inject.js` → `content.js` → `background.js` → MCP server → AI client.
+3. Background injects `inject.js` into the Figma tab's **MAIN world** via `chrome.scripting.executeScript` (exempt from Figma's strict CSP).
+4. Background dispatches `FETCH_NODE_DATA` to `content.js`.
+5. `content.js` forwards the request to `inject.js` via `window.postMessage`.
+6. `inject.js` reads from `window.figma`, serializes the node tree along with styling, geometry, and accessibility specs.
+7. The response traverses back: `inject.js` → `content.js` → `background.js` → MCP server → AI client.
 
 ---
 
-## Installation
+## Quick Start & Installation
 
-### 1. Download the Extension
+### 1. Load the Chrome Extension
 
-Go to the [Releases page](../../releases/latest) and download:
+1. Download **`figma-mcp-bridge-{version}.zip`** from the [Releases page](../../releases/latest) (or clone this repository).
+2. Unzip the file into a local folder.
+3. In Chrome, open `chrome://extensions/` and enable **Developer mode** (top-right toggle).
+4. Click **Load unpacked** and select the extension folder.
+5. The **Figma MCP Bridge** icon will appear in your toolbar. Pin it to see live connection status (`ON` / `OFF`).
 
-- **`figma-mcp-bridge-{version}.zip`** — the Chrome extension
-- **`figma-mcp-server-{version}.tar.gz`** — the local MCP server
+### 2. Configure Your AI Client (Automated or Manual)
 
-Then load the extension in Chrome:
-
-1. Unzip `figma-mcp-bridge-{version}.zip` into a local folder.
-2. Open Chrome and go to `chrome://extensions/`.
-3. Enable **Developer mode** (top-right toggle).
-4. Click **Load unpacked** and select the unzipped folder.
-5. The **Figma MCP Bridge** extension card will appear.
-
-> **Alternatively**, clone the repository and load the root folder directly as an unpacked extension — useful if you want to modify the source.
-
-### 2. Start the MCP Server
-
-Extract `figma-mcp-server-{version}.tar.gz`, then:
+#### Automated Setup (Recommended)
+Run the multi-harness setup tool to automatically detect and configure all installed AI clients (Claude Desktop, Cursor, Antigravity, Windsurf, VS Code Cline, Zed):
 
 ```bash
-nvm use 22
-npm install
-node index.js
+# On Windows / macOS / Linux:
+npm run setup-harness
+
+# Or double-click setup.bat (Windows) or ./setup.sh (macOS/Linux)
 ```
 
-The server listens on `ws://127.0.0.1:9223` for the extension and communicates via `stdio` with your AI client.
+#### Manual Configurations
 
-### 3. Register with Your AI Client
-
-#### Claude Desktop
-`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)  
-`%APPDATA%\Claude\claude_desktop_config.json` (Windows)
+<details>
+<summary><b>Claude Desktop</b> (<code>claude_desktop_config.json</code>)</summary>
 
 ```json
 {
   "mcpServers": {
     "figma-browser-bridge": {
       "command": "node",
-      "args": ["/absolute/path/to/server/index.js"]
+      "args": ["c:/Users/Parallel/Documents/others/figma-mcp-browser/server/index.js"]
     }
   }
 }
 ```
+</details>
 
-#### Antigravity / Codex
+<details>
+<summary><b>Cursor IDE</b> (<code>.cursor/mcp.json</code>)</summary>
+
 ```json
 {
-  "mcp": {
-    "servers": {
-      "figma-browser-bridge": {
-        "command": "node",
-        "args": ["/absolute/path/to/server/index.js"]
+  "mcpServers": {
+    "figma-browser-bridge": {
+      "command": "node",
+      "args": ["c:/Users/Parallel/Documents/others/figma-mcp-browser/server/index.js"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Google Antigravity &amp; Gemini CLI</b> (<code>mcp_config.json</code>)</summary>
+
+```json
+{
+  "mcpServers": {
+    "figma-browser-bridge": {
+      "command": "node",
+      "args": ["c:/Users/Parallel/Documents/others/figma-mcp-browser/server/index.js"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Windsurf</b> (<code>~/.codeium/windsurf/mcp_config.json</code>)</summary>
+
+```json
+{
+  "mcpServers": {
+    "figma-browser-bridge": {
+      "command": "node",
+      "args": ["c:/Users/Parallel/Documents/others/figma-mcp-browser/server/index.js"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>VS Code (Cline / Roo Code)</b> (<code>cline_mcp_settings.json</code>)</summary>
+
+```json
+{
+  "mcpServers": {
+    "figma-browser-bridge": {
+      "command": "node",
+      "args": ["c:/Users/Parallel/Documents/others/figma-mcp-browser/server/index.js"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Zed Editor</b> (<code>settings.json</code>)</summary>
+
+```json
+{
+  "context_servers": {
+    "figma-browser-bridge": {
+      "command": {
+        "path": "node",
+        "args": ["c:/Users/Parallel/Documents/others/figma-mcp-browser/server/index.js"]
       }
     }
   }
 }
 ```
+</details>
+
+---
+
+## AI Agent Skills (<code>.agents/skills/</code>)
+
+The project includes specialized skills designed for AI coding agents:
+
+- **`figma-design-to-code`**: Comprehensive engineering rules to transform AutoLayout, typography, colors, strokes, and accessibility roles into React/Tailwind/HTML.
+- **`figma-harness-setup`**: Runbook and diagnostic guide for connecting and troubleshooting MCP hosts.
+- **`figma-session-manager`**: Safe DPAPI session extraction and cookie synchronization runbook.
+- **`figma-mcp-debug`**: 4-hop architecture verification, toolbar badge states, and connection recovery.
 
 ---
 
 ## Usage
 
-### Step 1 — Open a Figma Design Tab
+### Step 1 — Open a Figma Tab
+Open any Figma design file in Chrome (URL containing `/design/`, `/file/`, or `/board/`). The extension auto-injects `inject.js` into the page's MAIN execution world upon page load.
 
-Navigate to a Figma design file in Chrome (URL must contain `/design/`, `/file/`, or `/board/`). The extension auto-injects `inject.js` into the page's MAIN world as soon as the tab finishes loading.
+### Step 2 — Check Extension Popup
+Click the **Figma MCP Bridge** icon in Chrome's toolbar to open the popup dashboard:
+- **Local MCP Server**: Verify connection to `ws://127.0.0.1:9223`. If disconnected, click **Reconnect**.
+- **Active Figma Tab**: Displays current file key, active layer ID, and injection status.
+- **Session Sync**: Displays authenticated user email and cookie status with a one-click **Sync Session** button.
 
-### Step 2 — Register the Figma Object (One-Time Per Session)
-
-Figma exposes its in-memory Plugin API via `window.figma`, but it initialises asynchronously after the editor boots. You need to hand it to the bridge once per session.
-
-Open **DevTools** on the Figma tab (`F12` or `Cmd+Option+I`) and run:
+### Step 3 — Register Figma Object (If Required)
+If the Figma canvas is isolated in an internal iframe, open DevTools (`F12`) on the Figma tab and run:
 
 ```js
 injectFigma(window.figma)
 ```
 
-You will see this confirmation in the console:
-
-```
+The console will confirm:
+```text
 [Figma MCP] figma object registered. Bridge is ready.
 ```
 
-> **Why is this needed?**  
-> Figma's `window.figma` object is only available after the editor fully initialises — not at page load time. The `injectFigma()` function is exposed by `inject.js` as a bridge hook so you can hand off the live figma instance once the editor is ready. This is a one-time step per tab session (after reload or navigation you repeat it).
+---
 
-### Step 3 — Use the MCP Tools
+## MCP Tools Reference
 
-#### `get_figma_node`
-Fetch the full node tree for a specific node ID.
-
-```
-fileKey  — the segment after /design/ in the Figma URL
-nodeId   — the node ID (e.g. "474-11039" or "474:11039")
-```
-
-Extract both from the Figma URL:
-```
-https://www.figma.com/design/AbcFcJrZvvOf6LmK2P8t0W/My-File?node-id=474-11039
-                              ┗━━━━━━ fileKey ━━━━━━━┛                ┗━ nodeId ━┛
-```
-
-#### `get_active_selection`
-Fetch the node currently selected in the active Figma tab (no arguments needed). The extension tracks URL-based selection changes automatically via a 500ms poller.
+| Tool Name | Arguments | Description |
+|---|---|---|
+| `get_figma_node` | `fileKey` (string), `nodeId` (string) | Recursively fetches complete layout, styling, text, strokes, dimensions, and accessibility data for the targeted layer. |
+| `get_active_selection` | *(none)* | Dynamically retrieves the layer currently selected by the designer in their active Figma browser tab. |
+| `get_session_status` | *(none)* | Checks local Figma session status (account email, subscription plan, expiration, and valid cookie count). |
+| `sync_figma_session` | *(none)* | Decrypts active cookies from local Figma Desktop or Chrome and syncs them directly into the MCP browser profile. |
 
 ---
 
-## Output Format
+## Output Format & Accessibility Specs
 
-Each node is serialized recursively, including all children:
+The node data is recursively serialized with full styling and accessibility context:
 
 ```json
 {
   "id": "482:9088",
-  "name": "🟪 OUR PROJECTS",
+  "name": "🟪 Submit Button",
   "type": "FRAME",
   "visible": true,
+  "opacity": 1,
+  "blendMode": "NORMAL",
+  "isMask": false,
+  "clipsContent": true,
   "dimensions": {
-    "width": 1440,
-    "height": 1120,
-    "absoluteBoundingBox": { "x": 2952, "y": -11704, "width": 1440, "height": 1120 }
+    "width": 240,
+    "height": 48,
+    "absoluteBoundingBox": { "x": 120, "y": 450, "width": 240, "height": 48 }
   },
+  "cornerRadius": 8,
   "autoLayout": {
-    "direction": "VERTICAL",
-    "itemSpacing": 48,
-    "padding": { "left": 100, "right": 100, "top": 116, "bottom": 116 }
+    "direction": "HORIZONTAL",
+    "itemSpacing": 8,
+    "padding": { "left": 16, "right": 16, "top": 12, "bottom": 12 }
   },
   "fills": [
-    { "type": "SOLID", "visible": true, "opacity": 1, "color": { "r": 243, "g": 243, "b": 243, "a": 1 } }
+    { "type": "SOLID", "visible": true, "opacity": 1, "color": { "r": 135, "g": 79, "b": 255, "a": 1 } }
   ],
+  "strokes": [
+    { "type": "SOLID", "visible": true, "opacity": 1, "color": { "r": 255, "g": 255, "b": 255, "a": 0.2 } }
+  ],
+  "strokeWeight": 1,
+  "strokeAlign": "INSIDE",
   "textContext": null,
+  "accessibility": {
+    "description": "Primary action button for form submission",
+    "inferredRole": "button",
+    "annotations": [
+      { "label": "Accessibility: WCAG AA compliant contrast ratio" }
+    ]
+  },
   "children": [
     {
-      "id": "482:9090",
-      "name": "so...what have we built?",
+      "id": "482:9089",
+      "name": "Submit",
       "type": "TEXT",
       "visible": true,
       "textContext": {
-        "characters": "so...what have we built?",
-        "fontSize": 60,
-        "fontFamily": "Anton",
-        "fontWeight": "Regular"
+        "characters": "Submit",
+        "fontSize": 16,
+        "fontFamily": "Inter",
+        "fontWeight": "Semi Bold"
+      },
+      "accessibility": {
+        "inferredRole": "text"
       },
       "children": null
     }
@@ -204,70 +284,19 @@ Each node is serialized recursively, including all children:
 }
 ```
 
-**Fields:**
-| Field | Description |
-|---|---|
-| `id` | Figma node ID (colon format) |
-| `name` | Layer name as shown in the Figma layers panel |
-| `type` | Node type: `FRAME`, `TEXT`, `RECTANGLE`, `VECTOR`, `LINE`, etc. |
-| `visible` | `false` when the layer is hidden in the editor (eye icon off); `true` otherwise |
-| `dimensions` | Width, height, and absolute canvas position |
-| `autoLayout` | Direction, item spacing, and padding (null if not an auto-layout frame) |
-| `fills` | Array of fill objects with type, color (RGB 0–255), opacity, and visibility |
-| `textContext` | Text content, font size, font family, and weight (null for non-text nodes) |
-| `children` | Recursively serialized child nodes (null for leaf nodes) |
-
 ---
 
-## WebSocket Protocol
+## Developer Commands
 
-### Incoming: Fetch Node
-
-```json
-{
-  "action": "GET_NODE_DATA",
-  "requestId": "req_1716912345_1",
-  "fileKey": "AbcFcJrZvvOf6LmK2P8t0W",
-  "nodeId": "474-11039",
-  "fetchSelection": false
-}
-```
-
-Set `fetchSelection: true` to read the active in-editor selection instead of a specific node ID.
-
-### Outgoing: Node Response
-
-```json
-{
-  "requestId": "req_1716912345_1",
-  "timestamp": 1716912345678,
-  "success": true,
-  "data": { ... }
-}
-```
-
-### Outgoing: Selection Change Broadcast
-
-```json
-{
-  "event": "SELECTION_CHANGED",
-  "fileKey": "AbcFcJrZvvOf6LmK2P8t0W",
-  "nodeId": "474:11039",
-  "timestamp": 1716912345790
-}
-```
-
----
-
-## Troubleshooting
-
-| Problem | Solution |
+| Command | Action |
 |---|---|
-| `injectFigma is not defined` | The extension wasn't loaded yet or the Figma tab wasn't refreshed after loading the extension. Hard-refresh the Figma tab (`Ctrl+Shift+R`) and wait for the editor to fully load. |
-| `[Figma MCP] figma object registered` but requests still fail | The WebSocket connection to the MCP server may be down. Make sure `npm start` is running in the `server/` directory. |
-| Request timeout (10s) | The bridge is connected but `window.figma` was not registered. Run `injectFigma(window.figma)` in the DevTools console. |
-| Node not found | The node ID doesn't exist in the currently open Figma file. Check that the fileKey in your request matches the file open in the browser tab. |
-| Service worker suspended | Chrome MV3 service workers go idle after ~30s of inactivity. Selecting a layer in Figma wakes the worker immediately via the content script keep-alive. |
+| `npm start` | Launches the local WebSocket and MCP server (`node server/index.js`) |
+| `npm run setup-harness` | Auto-detects and configures all installed AI harnesses (Claude, Cursor, Antigravity, etc.) |
+| `npm run package` | Builds all 3 clean release archives in `dist/` (Extension zip, Server tarball, Universal Suite) |
+| `npm run sync-session` | Extracts and syncs local Figma session cookies to the MCP browser profile |
+| `npm run session-status` | Displays authenticated Figma account metadata |
+| `npm run session-state` | Displays currently active Figma file, node, and open tabs from the loaded session |
+| `npm run collect-session` | Exports full session metadata, active state, and cookie status |
 
 ---
 

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#874FFF" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#0ACF83" stop-opacity="0.8"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="#18181B" stroke="url(#glow)" stroke-width="2.5"/>
+  <line x1="46" y1="46" x2="82" y2="46" stroke="#874FFF" stroke-width="5" stroke-linecap="round"/>
+  <line x1="46" y1="46" x2="46" y2="82" stroke="#18A0FB" stroke-width="5" stroke-linecap="round"/>
+  <line x1="82" y1="46" x2="82" y2="82" stroke="#0ACF83" stroke-width="5" stroke-linecap="round"/>
+  <line x1="46" y1="82" x2="82" y2="82" stroke="#2DD4BF" stroke-width="5" stroke-linecap="round"/>
+  <line x1="46" y1="46" x2="82" y2="82" stroke="#FFFFFF" stroke-opacity="0.7" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="46" cy="46" r="13" fill="#F24E1E"/>
+  <circle cx="82" cy="46" r="13" fill="#874FFF"/>
+  <circle cx="46" cy="82" r="13" fill="#18A0FB"/>
+  <circle cx="82" cy="82" r="13" fill="#0ACF83"/>
+  <circle cx="64" cy="64" r="8" fill="#FFFFFF"/>
+</svg>

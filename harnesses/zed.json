@@ -1,0 +1,12 @@
+{
+  "context_servers": {
+    "figma-browser-bridge": {
+      "command": {
+        "path": "node",
+        "args": [
+          "${PROJECT_ROOT}/server/index.js"
+        ]
+      }
+    }
+  }
+}

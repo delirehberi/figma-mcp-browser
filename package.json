@@ -1,0 +1,36 @@
+{
+  "name": "figma-mcp-browser",
+  "version": "1.2.0",
+  "description": "Figma MCP Bridge Chrome Extension & Local MCP Server",
+  "type": "module",
+  "bin": {
+    "figma-mcp-browser": "./bin/figma-mcp-browser.js",
+    "figma-bridge": "./bin/figma-mcp-browser.js"
+  },
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "package": "node scripts/package.js",
+    "setup-harness": "node scripts/setup-harness.js",
+    "sync-session": "python server/session_sync.py --sync-mcp",
+    "session-status": "python server/session_sync.py --status",
+    "session-state": "python server/session_sync.py --active-state",
+    "collect-session": "python server/session_sync.py --session-data"
+  },
+  "keywords": [
+    "figma",
+    "mcp",
+    "model-context-protocol",
+    "chrome-extension",
+    "claude",
+    "antigravity",
+    "ai-agent",
+    "design-to-code"
+  ],
+  "author": "Hojjat Shafiee <better_call_hojat@proton.me>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hojat-shafiee/figma-mcp-browser.git"
+  }
+}

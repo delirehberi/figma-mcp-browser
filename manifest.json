@@ -1,17 +1,33 @@
 {
   "manifest_version": 3,
   "name": "Figma MCP Bridge",
-  "version": "1.0.0",
+  "version": "1.2.0",
+  "minimum_chrome_version": "116",
   "description": "Bridges Figma node data to a local Model Context Protocol (MCP) server in real-time.",
   "permissions": [
     "activeTab",
     "scripting",
     "alarms",
-    "tabs"
+    "tabs",
+    "cookies"
   ],
   "host_permissions": [
     "https://*.figma.com/*"
   ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Figma MCP Bridge",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -28,4 +44,3 @@
     }
   ]
 }
-
